@@ -4,33 +4,36 @@ import (
 	"errors"
 	"sync"
 	"time"
+
+	"github.com/maypok86/wb-l0/internal/entity"
 )
 
 var ErrItemNotFound = errors.New("cache: item not found")
 
 type item struct {
-	value     any
+	value     *entity.Order
 	createdAt int64
 	ttl       int64
 }
 
 type MemoryCache struct {
 	mutex sync.RWMutex
-	cache map[any]*item
+	cache map[int]*item
 }
 
 func NewMemoryCache() *MemoryCache {
-	c := &MemoryCache{cache: make(map[any]*item)}
-	c.setTTLTimer()
+	c := &MemoryCache{cache: make(map[int]*item)}
+	go c.setTTLTimer()
 
 	return c
 }
 
 func (c *MemoryCache) setTTLTimer() {
 	for {
+		now := time.Now().Unix()
 		c.mutex.Lock()
 		for k, v := range c.cache {
-			if time.Now().Unix()-v.createdAt > v.ttl {
+			if now-v.createdAt > v.ttl {
 				delete(c.cache, k)
 			}
 		}
@@ -40,7 +43,7 @@ func (c *MemoryCache) setTTLTimer() {
 	}
 }
 
-func (c *MemoryCache) Set(key, value any, ttl int64) error {
+func (c *MemoryCache) Set(key int, value *entity.Order, ttl int64) error {
 	c.mutex.Lock()
 	c.cache[key] = &item{
 		value:     value,
@@ -52,7 +55,7 @@ func (c *MemoryCache) Set(key, value any, ttl int64) error {
 	return nil
 }
 
-func (c *MemoryCache) Get(key any) (any, error) {
+func (c *MemoryCache) Get(key int) (*entity.Order, error) {
 	c.mutex.RLock()
 	item, ok := c.cache[key]
 	c.mutex.RUnlock()
