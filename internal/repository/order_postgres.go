@@ -15,20 +15,20 @@ func NewOrderPostgresRepository(db *postgres.Postgres) OrderPostgresRepository {
 	return OrderPostgresRepository{db: db}
 }
 
-func (opr OrderPostgresRepository) CreateOrder(ctx context.Context, data []byte) error {
-	sql, args, err := opr.db.Builder.Insert("orders").Columns("data").Values(data).ToSql()
+func (opr OrderPostgresRepository) CreateOrder(ctx context.Context, data []byte) (int, error) {
+	sql, args, err := opr.db.Builder.Insert("orders").Columns("data").Suffix("RETURNING id").Values(data).ToSql()
 	if err != nil {
-		return fmt.Errorf("can not build sql for create order query: %w", err)
+		return 0, fmt.Errorf("can not build sql for create order query: %w", err)
 	}
 
-	_, err = opr.db.Pool.Exec(ctx, sql, args...)
-	if err != nil {
-		return fmt.Errorf("can not create order: %w", err)
+	var id int
+	if err := opr.db.Pool.QueryRow(ctx, sql, args...).Scan(&id); err != nil {
+		return 0, fmt.Errorf("can not create order: %w", err)
 	}
-	return nil
+	return id, nil
 }
 
-func (opr OrderPostgresRepository) GetOrderDataByID(ctx context.Context, id int) ([]byte, error) {
+func (opr OrderPostgresRepository) GetOrderByID(ctx context.Context, id int) ([]byte, error) {
 	sql, args, err := opr.db.Builder.Select("data").From("orders").Where("id = ?", id).Limit(1).ToSql()
 	if err != nil {
 		return nil, fmt.Errorf("can not build sql for get order by id query: %w", err)

@@ -51,6 +51,10 @@ test.unit: ## Run all unit tests
 cover: test.unit ## Run all the tests and opens the coverage report
 	go tool cover -html=coverage.txt
 
+.PHONY: generate
+gen: ## Generate files
+	go generate ./...
+
 .PHONY: ci
 ci: lint test.unit ## Run all the tests and code checks
 
