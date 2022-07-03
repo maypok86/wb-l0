@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v4"
 	"github.com/maypok86/wb-l0/internal/entity"
 	"github.com/maypok86/wb-l0/pkg/postgres"
 )
@@ -16,13 +17,7 @@ func NewOrderPostgresRepository(db *postgres.Postgres) OrderPostgresRepository {
 	return OrderPostgresRepository{db: db}
 }
 
-func (opr OrderPostgresRepository) CreateOrder(ctx context.Context, order *entity.Order) (*entity.Order, error) {
-	tx, err := opr.db.Pool.Begin(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("can not begin transaction: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
+func (opr OrderPostgresRepository) createDelivery(ctx context.Context, tx pgx.Tx, delivery entity.Delivery) (int, error) {
 	sql, args, err := opr.db.Builder.Insert("deliveries").Columns(
 		"name",
 		"phone",
@@ -32,24 +27,28 @@ func (opr OrderPostgresRepository) CreateOrder(ctx context.Context, order *entit
 		"region",
 		"email",
 	).Suffix("RETURNING id").Values(
-		order.Delivery.Name,
-		order.Delivery.Phone,
-		order.Delivery.Zip,
-		order.Delivery.City,
-		order.Delivery.Address,
-		order.Delivery.Region,
-		order.Delivery.Email,
+		delivery.Name,
+		delivery.Phone,
+		delivery.Zip,
+		delivery.City,
+		delivery.Address,
+		delivery.Region,
+		delivery.Email,
 	).ToSql()
 	if err != nil {
-		return nil, fmt.Errorf("can not build insert delivery query: %w", err)
+		return 0, fmt.Errorf("can not build insert delivery query: %w", err)
 	}
 
 	var deliveryID int
 	if err := tx.QueryRow(ctx, sql, args...).Scan(&deliveryID); err != nil {
-		return nil, fmt.Errorf("")
+		return 0, fmt.Errorf("can not insert delivery: %w", err)
 	}
 
-	sql, args, err = opr.db.Builder.Insert("payments").Columns(
+	return deliveryID, nil
+}
+
+func (opr OrderPostgresRepository) createPayment(ctx context.Context, tx pgx.Tx, payment entity.Payment) error {
+	sql, args, err := opr.db.Builder.Insert("payments").Columns(
 		"transaction",
 		"request_id",
 		"currency",
@@ -61,27 +60,30 @@ func (opr OrderPostgresRepository) CreateOrder(ctx context.Context, order *entit
 		"goods_total",
 		"custom_fee",
 	).Values(
-		order.Payment.Transaction,
-		order.Payment.RequestID,
-		order.Payment.Currency,
-		order.Payment.Provider,
-		order.Payment.Amount,
-		order.Payment.PaymentDt,
-		order.Payment.Bank,
-		order.Payment.DeliveryCost,
-		order.Payment.GoodsTotal,
-		order.Payment.CustomFee,
+		payment.Transaction,
+		payment.RequestID,
+		payment.Currency,
+		payment.Provider,
+		payment.Amount,
+		payment.PaymentDt,
+		payment.Bank,
+		payment.DeliveryCost,
+		payment.GoodsTotal,
+		payment.CustomFee,
 	).ToSql()
 	if err != nil {
-		return nil, fmt.Errorf("can not build insert payment query: %w", err)
+		return fmt.Errorf("can not build insert payment query: %w", err)
 	}
 
 	_, err = tx.Exec(ctx, sql, args...)
 	if err != nil {
-		return nil, fmt.Errorf("can not insert payment: %w", err)
+		return fmt.Errorf("can not insert payment: %w", err)
 	}
+	return nil
+}
 
-	sql, args, err = opr.db.Builder.Insert("orders").Columns(
+func (opr OrderPostgresRepository) createOrder(ctx context.Context, tx pgx.Tx, order *entity.Order, deliveryID int) error {
+	sql, args, err := opr.db.Builder.Insert("orders").Columns(
 		"order_uid",
 		"track_number",
 		"entry",
@@ -109,16 +111,19 @@ func (opr OrderPostgresRepository) CreateOrder(ctx context.Context, order *entit
 		order.OofShard,
 	).ToSql()
 	if err != nil {
-		return nil, fmt.Errorf("can not build insert order query: %w", err)
+		return fmt.Errorf("can not build insert order query: %w", err)
 	}
 
 	_, err = tx.Exec(ctx, sql, args...)
 	if err != nil {
-		return nil, fmt.Errorf("can not insert order: %w", err)
+		return fmt.Errorf("can not insert order: %w", err)
 	}
+	return nil
+}
 
-	for _, item := range order.Items {
-		sql, args, err = opr.db.Builder.Insert("items").Columns(
+func (opr OrderPostgresRepository) createItems(ctx context.Context, tx pgx.Tx, items []entity.Item) error {
+	for _, item := range items {
+		sql, args, err := opr.db.Builder.Insert("items").Columns(
 			"chrt_id",
 			"track_number",
 			"price",
@@ -144,13 +149,39 @@ func (opr OrderPostgresRepository) CreateOrder(ctx context.Context, order *entit
 			item.Status,
 		).ToSql()
 		if err != nil {
-			return nil, fmt.Errorf("can not build insert item query: %w", err)
+			return fmt.Errorf("can not build insert item query: %w", err)
 		}
 
 		_, err = tx.Exec(ctx, sql, args...)
 		if err != nil {
-			return nil, fmt.Errorf("can not insert item: %w", err)
+			return fmt.Errorf("can not insert item: %w", err)
 		}
+	}
+	return nil
+}
+
+func (opr OrderPostgresRepository) CreateOrder(ctx context.Context, order *entity.Order) (*entity.Order, error) {
+	tx, err := opr.db.Pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("can not begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	deliveryID, err := opr.createDelivery(ctx, tx, order.Delivery)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := opr.createPayment(ctx, tx, order.Payment); err != nil {
+		return nil, err
+	}
+
+	if err := opr.createOrder(ctx, tx, order, deliveryID); err != nil {
+		return nil, err
+	}
+
+	if err := opr.createItems(ctx, tx, order.Items); err != nil {
+		return nil, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {

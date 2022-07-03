@@ -37,12 +37,6 @@ func readFile(t *testing.T, filename string) []byte {
 	return data
 }
 
-func invalidOrderData(t *testing.T) []byte {
-	t.Helper()
-
-	return readFile(t, "fixtures/invalid_model.json")
-}
-
 func validOrderData(t *testing.T) []byte {
 	t.Helper()
 
@@ -66,81 +60,53 @@ func validOrders(t *testing.T, length int) []*entity.Order {
 	return orders
 }
 
-func getJSONData(t *testing.T, v any) []byte {
+func fakeTTL(t *testing.T) time.Duration {
 	t.Helper()
 
-	data, err := json.Marshal(v)
-	require.NoError(t, err)
-	return data
-}
-
-func getOrdersData(t *testing.T, orders []*entity.Order) [][]byte {
-	t.Helper()
-
-	data := make([][]byte, len(orders))
-	for i, order := range orders {
-		data[i] = getJSONData(t, order)
-	}
-	return data
+	var ttl time.Duration
+	require.NoError(t, faker.FakeData(&ttl))
+	return ttl
 }
 
 func TestOrderUsecase_CreateOrder(t *testing.T) {
 	order, cache, repo := mockOrderUsecase(t)
-	const id = 0
-	const ttl = 60
+	validOrder := validOrder(t)
+	ttl := fakeTTL(t)
 
 	tests := []struct {
 		name   string
 		mock   func()
-		data   []byte
+		order  *entity.Order
 		result *entity.Order
 		err    error
 	}{
 		{
 			name: "error in repo",
 			mock: func() {
-				repo.EXPECT().CreateOrder(context.Background(), gomock.Any()).Return(id, errors.New("some error"))
+				repo.EXPECT().CreateOrder(context.Background(), gomock.Any()).Return(nil, errors.New("some error"))
 			},
-			data:   nil,
+			order:  nil,
 			result: nil,
 			err:    errors.New("can not create in repository: some error"),
 		},
 		{
-			name: "not valid json",
-			mock: func() {
-				repo.EXPECT().CreateOrder(context.Background(), gomock.Any()).Return(id, nil)
-			},
-			data:   []byte("<>"),
-			result: nil,
-			err:    errors.New("can not parse json order: invalid character '<' looking for beginning of value"),
-		},
-		{
-			name: "not valid json order data",
-			mock: func() {
-				repo.EXPECT().CreateOrder(context.Background(), gomock.Any()).Return(id, nil)
-			},
-			data:   invalidOrderData(t),
-			result: nil,
-			err:    errors.New("can not parse json order: json: cannot unmarshal number into Go struct field Order.locale of type string"),
-		},
-		{
 			name: "error in cache",
 			mock: func() {
-				repo.EXPECT().CreateOrder(context.Background(), gomock.Any()).Return(id, nil)
-				cache.EXPECT().Set(id, gomock.Any(), gomock.Any()).Return(errors.New("some error"))
+				repo.EXPECT().CreateOrder(context.Background(), gomock.Any()).Return(validOrder, nil)
+				cache.EXPECT().Set(validOrder.OrderUID, gomock.Any(), gomock.Any()).Return(errors.New("some error"))
 			},
-			data:   validOrderData(t),
+			order:  validOrder,
 			result: nil,
 			err:    errors.New("can not create order in cache: some error"),
 		},
 		{
 			name: "success",
 			mock: func() {
-				repo.EXPECT().CreateOrder(context.Background(), gomock.Any()).Return(id, nil)
-				cache.EXPECT().Set(id, gomock.Any(), gomock.Any()).Return(nil)
+				repo.EXPECT().CreateOrder(context.Background(), gomock.Any()).Return(validOrder, nil)
+				cache.EXPECT().Set(validOrder.OrderUID, gomock.Any(), gomock.Any()).Return(nil)
 			},
-			data:   validOrderData(t),
-			result: validOrder(t),
+			order:  validOrder,
+			result: validOrder,
 			err:    nil,
 		},
 	}
@@ -149,7 +115,7 @@ func TestOrderUsecase_CreateOrder(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.mock()
 
-			result, err := order.CreateOrder(context.Background(), tt.data, ttl)
+			result, err := order.CreateOrder(context.Background(), tt.order, ttl)
 			require.Equal(t, tt.result, result)
 			if tt.err != nil {
 				require.Equal(t, tt.err.Error(), err.Error())
@@ -162,11 +128,8 @@ func TestOrderUsecase_CreateOrder(t *testing.T) {
 
 func TestOrderUsecase_GetOrderByID(t *testing.T) {
 	order, cache, repo := mockOrderUsecase(t)
-	const id = 0
 
-	invalidOrderData := invalidOrderData(t)
-	validOrderData := validOrderData(t)
-	validOrder := validOrder(t)
+	orderEntity := validOrder(t)
 
 	tests := []struct {
 		name   string
@@ -177,45 +140,29 @@ func TestOrderUsecase_GetOrderByID(t *testing.T) {
 		{
 			name: "contains in cache",
 			mock: func() {
-				cache.EXPECT().Get(id).Return(validOrder, nil)
+				cache.EXPECT().Get(orderEntity.OrderUID).Return(orderEntity, nil)
 			},
-			result: validOrder,
+			result: orderEntity,
 			err:    nil,
 		},
 		{
 			name: "error in repo",
 			mock: func() {
-				cache.EXPECT().Get(id).Return(nil, errors.New("cache error"))
-				repo.EXPECT().GetOrderByID(context.Background(), id).Return(nil, errors.New("repo error"))
+				cache.EXPECT().Get(orderEntity.OrderUID).Return(nil, errors.New("cache error"))
+				repo.EXPECT().
+					GetOrderByID(context.Background(), orderEntity.OrderUID).
+					Return(nil, errors.New("repo error"))
 			},
 			result: nil,
 			err:    errors.New("can not get order by id: repo error"),
 		},
 		{
-			name: "not valid json",
-			mock: func() {
-				cache.EXPECT().Get(id).Return(nil, errors.New("cache error"))
-				repo.EXPECT().GetOrderByID(context.Background(), id).Return([]byte("<>"), nil)
-			},
-			result: nil,
-			err:    errors.New("can not parse json order: invalid character '<' looking for beginning of value"),
-		},
-		{
-			name: "not valid json order data",
-			mock: func() {
-				cache.EXPECT().Get(id).Return(nil, errors.New("cache error"))
-				repo.EXPECT().GetOrderByID(context.Background(), id).Return(invalidOrderData, nil)
-			},
-			result: nil,
-			err:    errors.New("can not parse json order: json: cannot unmarshal number into Go struct field Order.locale of type string"),
-		},
-		{
 			name: "contains in repo",
 			mock: func() {
-				cache.EXPECT().Get(id).Return(nil, errors.New("cache error"))
-				repo.EXPECT().GetOrderByID(context.Background(), id).Return(validOrderData, nil)
+				cache.EXPECT().Get(orderEntity.OrderUID).Return(nil, errors.New("cache error"))
+				repo.EXPECT().GetOrderByID(context.Background(), orderEntity.OrderUID).Return(orderEntity, nil)
 			},
-			result: validOrder,
+			result: orderEntity,
 			err:    nil,
 		},
 	}
@@ -224,7 +171,7 @@ func TestOrderUsecase_GetOrderByID(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.mock()
 
-			result, err := order.GetOrderByID(context.Background(), id)
+			result, err := order.GetOrderByID(context.Background(), orderEntity.OrderUID)
 			require.Equal(t, tt.result, result)
 			if tt.err != nil {
 				require.Equal(t, tt.err.Error(), err.Error())
@@ -235,50 +182,54 @@ func TestOrderUsecase_GetOrderByID(t *testing.T) {
 	}
 }
 
-func TestOrderUsecase_GetAllOrders(t *testing.T) {
-	order, _, repo := mockOrderUsecase(t)
+func TestOrderUsecase_LoadDBToCache(t *testing.T) {
+	order, cache, repo := mockOrderUsecase(t)
 
+	ttl := fakeTTL(t)
 	const length = 10
 	orders := validOrders(t, length)
-	ordersData := getOrdersData(t, orders)
-	invalidOrdersData := make([][]byte, len(ordersData)+1)
-	copy(invalidOrdersData, ordersData)
-	invalidOrdersData[len(invalidOrdersData)-1] = invalidOrderData(t)
 
 	rand.Seed(time.Now().UnixNano())
-	rand.Shuffle(len(invalidOrdersData), func(i, j int) {
-		invalidOrdersData[i], invalidOrdersData[j] = invalidOrdersData[j], invalidOrdersData[i]
+	rand.Shuffle(len(orders), func(i, j int) {
+		orders[i], orders[j] = orders[j], orders[i]
 	})
+	index := rand.Intn(len(orders))
 
 	tests := []struct {
-		name   string
-		mock   func()
-		result []*entity.Order
-		err    error
+		name string
+		mock func()
+		err  error
 	}{
 		{
 			name: "error in repo",
 			mock: func() {
 				repo.EXPECT().GetAllOrders(context.Background()).Return(nil, errors.New("some error"))
 			},
-			result: nil,
-			err:    errors.New("can not get all orders from repo: some error"),
+			err: errors.New("can not get all orders: some error"),
 		},
 		{
-			name: "invalid json order data",
+			name: "error in cache",
 			mock: func() {
-				repo.EXPECT().GetAllOrders(context.Background()).Return(invalidOrdersData, nil)
+				repo.EXPECT().GetAllOrders(context.Background()).Return(orders, nil)
+				for i, order := range orders {
+					if i == index {
+						cache.EXPECT().Set(order.OrderUID, order, ttl).Return(errors.New("some error"))
+					} else {
+						cache.EXPECT().Set(order.OrderUID, order, ttl).Return(nil)
+					}
+				}
 			},
-			result: nil,
-			err:    errors.New("can not parse json order: json: cannot unmarshal number into Go struct field Order.locale of type string"),
+			err: errors.New("can not set order to cache: some error"),
 		},
 		{
 			name: "valid orders",
 			mock: func() {
-				repo.EXPECT().GetAllOrders(context.Background()).Return(ordersData, nil)
+				repo.EXPECT().GetAllOrders(context.Background()).Return(orders, nil)
+				for _, order := range orders {
+					cache.EXPECT().Set(order.OrderUID, order, ttl).Return(nil)
+				}
 			},
-			result: orders,
-			err:    nil,
+			err: nil,
 		},
 	}
 
@@ -286,12 +237,7 @@ func TestOrderUsecase_GetAllOrders(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.mock()
 
-			result, err := order.GetAllOrders(context.Background())
-			if result != nil {
-				require.Equal(t, getJSONData(t, tt.result), getJSONData(t, result))
-			} else {
-				require.Equal(t, tt.result, result)
-			}
+			err := order.LoadDBToCache(context.Background(), ttl)
 			if tt.err != nil {
 				require.Equal(t, tt.err.Error(), err.Error())
 			} else {

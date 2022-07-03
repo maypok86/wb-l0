@@ -26,7 +26,13 @@ func New(ctx context.Context) (App, error) {
 		ctx: ctx,
 		httpServer: httpserver.New(
 			handler.GetHTTPHandler(),
-			httpserver.NewConfig(cfg.HTTP.Host, cfg.HTTP.Port, cfg.HTTP.MaxHeaderBytes, cfg.HTTP.ReadTimeout, cfg.HTTP.WriteTimeout),
+			httpserver.NewConfig(
+				cfg.HTTP.Host,
+				cfg.HTTP.Port,
+				cfg.HTTP.MaxHeaderBytes,
+				cfg.HTTP.ReadTimeout,
+				cfg.HTTP.WriteTimeout,
+			),
 		),
 	}, nil
 }

@@ -7,6 +7,7 @@ package usecase_test
 import (
 	context "context"
 	reflect "reflect"
+	time "time"
 
 	gomock "github.com/golang/mock/gomock"
 	entity "github.com/maypok86/wb-l0/internal/entity"
@@ -36,7 +37,7 @@ func (m *MockOrderCache) EXPECT() *MockOrderCacheMockRecorder {
 }
 
 // Get mocks base method.
-func (m *MockOrderCache) Get(arg0 int) (*entity.Order, error) {
+func (m *MockOrderCache) Get(arg0 string) (*entity.Order, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", arg0)
 	ret0, _ := ret[0].(*entity.Order)
@@ -51,7 +52,7 @@ func (mr *MockOrderCacheMockRecorder) Get(arg0 interface{}) *gomock.Call {
 }
 
 // Set mocks base method.
-func (m *MockOrderCache) Set(arg0 int, arg1 *entity.Order, arg2 int64) error {
+func (m *MockOrderCache) Set(arg0 string, arg1 *entity.Order, arg2 time.Duration) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Set", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -88,10 +89,10 @@ func (m *MockOrderRepository) EXPECT() *MockOrderRepositoryMockRecorder {
 }
 
 // CreateOrder mocks base method.
-func (m *MockOrderRepository) CreateOrder(arg0 context.Context, arg1 []byte) (int, error) {
+func (m *MockOrderRepository) CreateOrder(arg0 context.Context, arg1 *entity.Order) (*entity.Order, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateOrder", arg0, arg1)
-	ret0, _ := ret[0].(int)
+	ret0, _ := ret[0].(*entity.Order)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -103,10 +104,10 @@ func (mr *MockOrderRepositoryMockRecorder) CreateOrder(arg0, arg1 interface{}) *
 }
 
 // GetAllOrders mocks base method.
-func (m *MockOrderRepository) GetAllOrders(arg0 context.Context) ([][]byte, error) {
+func (m *MockOrderRepository) GetAllOrders(arg0 context.Context) ([]*entity.Order, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAllOrders", arg0)
-	ret0, _ := ret[0].([][]byte)
+	ret0, _ := ret[0].([]*entity.Order)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -118,10 +119,10 @@ func (mr *MockOrderRepositoryMockRecorder) GetAllOrders(arg0 interface{}) *gomoc
 }
 
 // GetOrderByID mocks base method.
-func (m *MockOrderRepository) GetOrderByID(arg0 context.Context, arg1 int) ([]byte, error) {
+func (m *MockOrderRepository) GetOrderByID(arg0 context.Context, arg1 string) (*entity.Order, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetOrderByID", arg0, arg1)
-	ret0, _ := ret[0].([]byte)
+	ret0, _ := ret[0].(*entity.Order)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

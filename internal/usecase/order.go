@@ -2,8 +2,8 @@ package usecase
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/maypok86/wb-l0/internal/entity"
 )
@@ -11,14 +11,14 @@ import (
 //go:generate mockgen -source=order.go -destination=mock_test.go -package=usecase_test
 
 type OrderCache interface {
-	Set(int, *entity.Order, int64) error
-	Get(int) (*entity.Order, error)
+	Set(string, *entity.Order, time.Duration) error
+	Get(string) (*entity.Order, error)
 }
 
 type OrderRepository interface {
-	CreateOrder(context.Context, []byte) (int, error)
-	GetOrderByID(context.Context, int) ([]byte, error)
-	GetAllOrders(context.Context) ([][]byte, error)
+	CreateOrder(context.Context, *entity.Order) (*entity.Order, error)
+	GetOrderByID(context.Context, string) (*entity.Order, error)
+	GetAllOrders(context.Context) ([]*entity.Order, error)
 }
 
 type OrderUsecase struct {
@@ -33,49 +33,39 @@ func NewOrderUsecase(cache OrderCache, repository OrderRepository) OrderUsecase 
 	}
 }
 
-func (ou OrderUsecase) CreateOrder(ctx context.Context, data []byte, ttl int64) (*entity.Order, error) {
-	id, err := ou.repository.CreateOrder(ctx, data)
+func (ou OrderUsecase) CreateOrder(ctx context.Context, order *entity.Order, ttl time.Duration) (*entity.Order, error) {
+	order, err := ou.repository.CreateOrder(ctx, order)
 	if err != nil {
 		return nil, fmt.Errorf("can not create in repository: %w", err)
 	}
-	order := &entity.Order{}
-	if err := json.Unmarshal(data, order); err != nil {
-		return nil, fmt.Errorf("can not parse json order: %w", err)
-	}
-	if err := ou.cache.Set(id, order, ttl); err != nil {
+	if err := ou.cache.Set(order.OrderUID, order, ttl); err != nil {
 		return nil, fmt.Errorf("can not create order in cache: %w", err)
 	}
 	return order, nil
 }
 
-func (ou OrderUsecase) GetOrderByID(ctx context.Context, id int) (*entity.Order, error) {
-	order, err := ou.cache.Get(id)
+func (ou OrderUsecase) GetOrderByID(ctx context.Context, orderUID string) (*entity.Order, error) {
+	order, err := ou.cache.Get(orderUID)
 	if err != nil {
-		data, err := ou.repository.GetOrderByID(ctx, id)
+		order, err = ou.repository.GetOrderByID(ctx, orderUID)
 		if err != nil {
 			return nil, fmt.Errorf("can not get order by id: %w", err)
-		}
-		order = &entity.Order{}
-		if err := json.Unmarshal(data, order); err != nil {
-			return nil, fmt.Errorf("can not parse json order: %w", err)
 		}
 	}
 	return order, nil
 }
 
-func (ou OrderUsecase) GetAllOrders(ctx context.Context) ([]*entity.Order, error) {
-	const defaultOrdersCapacity = 64
-	orders := make([]*entity.Order, 0, defaultOrdersCapacity)
-	orderBytes, err := ou.repository.GetAllOrders(ctx)
+func (ou OrderUsecase) LoadDBToCache(ctx context.Context, ttl time.Duration) error {
+	orders, err := ou.repository.GetAllOrders(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("can not get all orders from repo: %w", err)
+		return fmt.Errorf("can not get all orders: %w", err)
 	}
-	for _, orderByte := range orderBytes {
-		order := &entity.Order{}
-		if err := json.Unmarshal(orderByte, order); err != nil {
-			return nil, fmt.Errorf("can not parse json order: %w", err)
+
+	for _, order := range orders {
+		if err := ou.cache.Set(order.OrderUID, order, ttl); err != nil {
+			return fmt.Errorf("can not set order to cache: %w", err)
 		}
-		orders = append(orders, order)
 	}
-	return orders, nil
+
+	return nil
 }
