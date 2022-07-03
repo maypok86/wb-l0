@@ -22,18 +22,27 @@ func fakeOrder(t *testing.T) *entity.Order {
 	return order
 }
 
+func fakeKey(t *testing.T) string {
+	t.Helper()
+
+	var key string
+	require.NoError(t, faker.FakeData(&key))
+	return key
+}
+
 func TestMemoryCache_Get(t *testing.T) {
 	c := NewMemoryCache()
 	order := fakeOrder(t)
-	gotOrder, err := c.Get(0)
+	key := fakeKey(t)
+	gotOrder, err := c.Get(key)
 	require.Error(t, err)
 	require.Nil(t, gotOrder)
-	c.cache[0] = &item{
+	c.cache[key] = &item{
 		value:     order,
 		createdAt: time.Now().Unix(),
 		ttl:       61,
 	}
-	gotOrder, err = c.Get(0)
+	gotOrder, err = c.Get(key)
 	require.NoError(t, err)
 	require.Equal(t, order, gotOrder)
 }
@@ -41,8 +50,9 @@ func TestMemoryCache_Get(t *testing.T) {
 func TestMemoryCache_Set(t *testing.T) {
 	c := NewMemoryCache()
 	order := fakeOrder(t)
-	require.NoError(t, c.Set(0, order, 1))
-	gotOrder, err := c.Get(0)
+	key := fakeKey(t)
+	require.NoError(t, c.Set(key, order, 1))
+	gotOrder, err := c.Get(key)
 	require.NoError(t, err)
 	require.Equal(t, order, gotOrder)
 }
@@ -50,12 +60,13 @@ func TestMemoryCache_Set(t *testing.T) {
 func TestMemoryCache_Clean(t *testing.T) {
 	c := NewMemoryCache()
 	order := fakeOrder(t)
-	require.NoError(t, c.Set(0, order, 1))
-	gotOrder, err := c.Get(0)
+	key := fakeKey(t)
+	require.NoError(t, c.Set(key, order, 1))
+	gotOrder, err := c.Get(key)
 	require.NoError(t, err)
 	require.Equal(t, order, gotOrder)
 	time.Sleep(2 * time.Second)
-	gotOrder, err = c.Get(0)
+	gotOrder, err = c.Get(key)
 	require.Error(t, err)
 	require.Nil(t, gotOrder)
 }

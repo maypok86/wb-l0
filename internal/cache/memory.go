@@ -18,11 +18,11 @@ type item struct {
 
 type MemoryCache struct {
 	mutex sync.RWMutex
-	cache map[int]*item
+	cache map[string]*item
 }
 
 func NewMemoryCache() *MemoryCache {
-	c := &MemoryCache{cache: make(map[int]*item)}
+	c := &MemoryCache{cache: make(map[string]*item)}
 	go c.setTTLTimer()
 
 	return c
@@ -43,19 +43,19 @@ func (c *MemoryCache) setTTLTimer() {
 	}
 }
 
-func (c *MemoryCache) Set(key int, value *entity.Order, ttl int64) error {
+func (c *MemoryCache) Set(key string, value *entity.Order, ttl time.Duration) error {
 	c.mutex.Lock()
 	c.cache[key] = &item{
 		value:     value,
 		createdAt: time.Now().Unix(),
-		ttl:       ttl,
+		ttl:       int64(ttl),
 	}
 	c.mutex.Unlock()
 
 	return nil
 }
 
-func (c *MemoryCache) Get(key int) (*entity.Order, error) {
+func (c *MemoryCache) Get(key string) (*entity.Order, error) {
 	c.mutex.RLock()
 	item, ok := c.cache[key]
 	c.mutex.RUnlock()
