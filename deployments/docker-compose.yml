@@ -15,6 +15,7 @@ services:
     ports:
       - ${HTTP_PORT}:${HTTP_PORT}
     depends_on:
+      - nats-streaming
       - migrator
 
   migrator:
@@ -49,5 +50,16 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
 
+  nats-streaming:
+    image: nats-streaming:alpine
+    container_name: wb-l0_nats-streaming
+    command: ["-store", "file", "-dir", "/data/msg"]
+    volumes:
+      - nats_data:/data
+    ports:
+      - ${STAN_PORT}:${STAN_PORT}
+      - "8222:8222"
+
 volumes:
   db_data:
+  nats_data:

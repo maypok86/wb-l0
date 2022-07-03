@@ -23,6 +23,7 @@ type (
 		Environment EnvType `envconfig:"ENVIRONMENT" required:"true"`
 		HTTP        HTTP
 		Postgres    Postgres
+		STAN        STAN
 		Logger      Logger
 	}
 
@@ -41,6 +42,14 @@ type (
 		User     string `envconfig:"POSTGRES_USER"     required:"true"`
 		Password string `envconfig:"POSTGRES_PASSWORD" required:"true" json:"-"`
 		SSLMode  string `envconfig:"POSTGRES_SSLMODE"                           default:"disable"`
+	}
+
+	STAN struct {
+		Host      string `envconfig:"STAN_HOST"       required:"true"`
+		Port      string `envconfig:"STAN_PORT"       required:"true"`
+		ClusterID string `envconfig:"STAN_CLUSTER_ID" required:"true"`
+		ClientID  string `envconfig:"STAN_CLIENT_ID"  required:"true"`
+		Channel   string `envconfig:"STAN_CHANNEL"    required:"true"`
 	}
 
 	Logger struct {

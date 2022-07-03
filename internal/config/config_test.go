@@ -19,6 +19,11 @@ func TestGet(t *testing.T) {
 		postgresDBName   string
 		postgresUser     string
 		postgresPassword string
+		stanHost         string
+		stanPort         string
+		stanClusterID    string
+		stanClientID     string
+		stanChannel      string
 	}
 
 	setEnv := func(env env) {
@@ -30,6 +35,11 @@ func TestGet(t *testing.T) {
 		require.NoError(t, os.Setenv("POSTGRES_DBNAME", env.postgresDBName))
 		require.NoError(t, os.Setenv("POSTGRES_USER", env.postgresUser))
 		require.NoError(t, os.Setenv("POSTGRES_PASSWORD", env.postgresPassword))
+		require.NoError(t, os.Setenv("STAN_HOST", env.stanHost))
+		require.NoError(t, os.Setenv("STAN_PORT", env.stanPort))
+		require.NoError(t, os.Setenv("STAN_CLUSTER_ID", env.stanClusterID))
+		require.NoError(t, os.Setenv("STAN_CLIENT_ID", env.stanClientID))
+		require.NoError(t, os.Setenv("STAN_CHANNEL", env.stanChannel))
 	}
 
 	tests := []struct {
@@ -48,6 +58,11 @@ func TestGet(t *testing.T) {
 				postgresDBName:   "test_wb-l0",
 				postgresUser:     "test_wb-l0",
 				postgresPassword: "test",
+				stanHost:         "0.0.0.0",
+				stanPort:         "4222",
+				stanClusterID:    "test-cluster",
+				stanClientID:     "test-client",
+				stanChannel:      "test",
 			},
 			want: &Config{
 				Environment: test,
@@ -65,6 +80,13 @@ func TestGet(t *testing.T) {
 					User:     "test_wb-l0",
 					Password: "test",
 					SSLMode:  "disable",
+				},
+				STAN: STAN{
+					Host:      "0.0.0.0",
+					Port:      "4222",
+					ClusterID: "test-cluster",
+					ClientID:  "test-client",
+					Channel:   "test",
 				},
 				Logger: Logger{
 					Level: "info",
