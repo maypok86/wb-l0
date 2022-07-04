@@ -22,6 +22,9 @@ func New(ctx context.Context, connectionConfig ConnectionConfig, opts ...Option)
 		opt(cfg)
 	}
 
+	instance := &Postgres{}
+	instance.Builder = sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
+
 	dsn := connectionConfig.getDSN()
 	poolCfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
@@ -29,7 +32,6 @@ func New(ctx context.Context, connectionConfig ConnectionConfig, opts ...Option)
 	}
 	poolCfg.MaxConns = int32(cfg.maxPoolSize)
 
-	instance := &Postgres{}
 	for cfg.connAttempts > 0 {
 		instance.Pool, err = pgxpool.ConnectConfig(ctx, poolCfg)
 		if err == nil {
@@ -47,4 +49,10 @@ func New(ctx context.Context, connectionConfig ConnectionConfig, opts ...Option)
 	}
 
 	return instance, nil
+}
+
+func (p *Postgres) Close() {
+	if p.Pool != nil {
+		p.Pool.Close()
+	}
 }

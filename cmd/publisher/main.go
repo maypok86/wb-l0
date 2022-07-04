@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"math/rand"
 	"os"
@@ -24,8 +25,8 @@ var (
 
 func init() {
 	flag.IntVar(&delay, "delay", 0, "delay between publications")
-	flag.StringVar(&clusterID, "cluster", "wb-cluster", "ClusterID for nats-streaming-server")
-	flag.StringVar(&clientID, "client", "wb-client", "ClientID for nats-streaming-server")
+	flag.StringVar(&clusterID, "cluster", "test-cluster", "ClusterID for stan-streaming-server")
+	flag.StringVar(&clientID, "client", "pub-client", "ClientID for stan-streaming-server")
 	flag.StringVar(&channel, "channel", "orders", "Channel for subscribe")
 }
 
@@ -37,6 +38,14 @@ func main() {
 	}
 }
 
+func printOrder(order *entity.Order) {
+	orderBytes, err := json.MarshalIndent(*order, "", " ")
+	if err != nil {
+		log.Fatal(fmt.Errorf("error marshaling indent order: %w", err))
+	}
+	fmt.Println("Order: ", string(orderBytes))
+}
+
 func publishOrder(channel string, conn stan.Conn, eChan chan<- error) {
 	rand.Seed(time.Now().Unix())
 	for {
@@ -45,16 +54,23 @@ func publishOrder(channel string, conn stan.Conn, eChan chan<- error) {
 			eChan <- err
 		}
 
+		order.Payment.Transaction = order.OrderUID
+		for i := range order.Items {
+			order.Items[i].TrackNumber = order.TrackNumber
+		}
+
 		data, err := json.Marshal(order)
 		if err != nil {
 			eChan <- err
 		}
 
-		i := rand.Intn(10)
+		i := rand.Intn(10) // nolint
 		if i == 0 {
 			data = []byte("<>")
 			order.OrderUID = "not valid json"
 		}
+
+		printOrder(order)
 
 		if err := conn.Publish(channel, data); err != nil {
 			eChan <- err
@@ -71,6 +87,13 @@ func publishOrder(channel string, conn stan.Conn, eChan chan<- error) {
 }
 
 func run() error {
+	if err := faker.SetRandomMapAndSliceMinSize(1); err != nil {
+		return err
+	}
+	if err := faker.SetRandomMapAndSliceSize(3); err != nil {
+		return err
+	}
+
 	conn, err := stan.Connect(clusterID, clientID, stan.NatsURL(stan.DefaultNatsURL))
 	if err != nil {
 		return err
