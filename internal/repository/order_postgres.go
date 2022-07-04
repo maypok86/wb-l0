@@ -415,12 +415,14 @@ func (opr OrderPostgresRepository) GetAllOrders(ctx context.Context) ([]*entity.
 			return nil, fmt.Errorf("can not scan order: %w", err)
 		}
 
+		orders = append(orders, order)
+	}
+
+	for _, order := range orders {
 		order.Items, err = opr.getItemsByTrackNumber(ctx, order.TrackNumber)
 		if err != nil {
 			return nil, err
 		}
-
-		orders = append(orders, order)
 	}
 
 	return orders, nil

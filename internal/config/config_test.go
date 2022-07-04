@@ -23,7 +23,6 @@ func TestGet(t *testing.T) {
 		stanPort         string
 		stanClusterID    string
 		stanClientID     string
-		stanChannel      string
 	}
 
 	setEnv := func(env env) {
@@ -39,7 +38,6 @@ func TestGet(t *testing.T) {
 		require.NoError(t, os.Setenv("STAN_PORT", env.stanPort))
 		require.NoError(t, os.Setenv("STAN_CLUSTER_ID", env.stanClusterID))
 		require.NoError(t, os.Setenv("STAN_CLIENT_ID", env.stanClientID))
-		require.NoError(t, os.Setenv("STAN_CHANNEL", env.stanChannel))
 	}
 
 	tests := []struct {
@@ -62,7 +60,6 @@ func TestGet(t *testing.T) {
 				stanPort:         "4222",
 				stanClusterID:    "test-cluster",
 				stanClientID:     "test-client",
-				stanChannel:      "test",
 			},
 			want: &Config{
 				Environment: test,
@@ -86,7 +83,6 @@ func TestGet(t *testing.T) {
 					Port:      "4222",
 					ClusterID: "test-cluster",
 					ClientID:  "test-client",
-					Channel:   "test",
 				},
 				Logger: Logger{
 					Level: "info",

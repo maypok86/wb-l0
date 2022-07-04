@@ -49,7 +49,6 @@ type (
 		Port      string `envconfig:"STAN_PORT"       required:"true"`
 		ClusterID string `envconfig:"STAN_CLUSTER_ID" required:"true"`
 		ClientID  string `envconfig:"STAN_CLIENT_ID"  required:"true"`
-		Channel   string `envconfig:"STAN_CHANNEL"    required:"true"`
 	}
 
 	Logger struct {

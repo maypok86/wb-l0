@@ -8,4 +8,4 @@ readonly ldflags="-X 'main.version=$git_hash' -X 'main.buildDate=$date'"
 readonly project=$1
 
 WAIT_VERSION=2.9.0 GOOSE_VERSION=3.6.0 LDFLAGS=$ldflags docker-compose \
-  -f deployments/docker-compose.yml -p "$project" --env-file .env up -d --build
+  -f deployments/docker-compose.yml -p "$project" --env-file .env up --build

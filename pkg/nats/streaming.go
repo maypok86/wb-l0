@@ -16,9 +16,10 @@ type Streaming struct {
 
 func NewStreaming(config Config) (*Streaming, error) {
 	natsURL := fmt.Sprintf("nats://%s:%s", config.Host, config.Port)
+	fmt.Println(natsURL)
 	conn, err := stan.Connect(config.ClusterID, config.ClientID, stan.NatsURL(natsURL))
 	if err != nil {
-		return nil, fmt.Errorf("can not connect to nats-streaming-server: %w", err)
+		return nil, fmt.Errorf("can not connect to stan-streaming-server: %w", err)
 	}
 	return &Streaming{
 		conn:          conn,

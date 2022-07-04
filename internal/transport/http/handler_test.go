@@ -5,19 +5,20 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/maypok86/wb-l0/internal/usecase"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewHandler(t *testing.T) {
-	h := NewHandler()
+	h := NewHandler(usecase.OrderUsecase{})
 
 	require.IsType(t, Handler{}, h)
 }
 
 func TestNewHandler_Get(t *testing.T) {
-	h := NewHandler()
+	h := NewHandler(usecase.OrderUsecase{})
 
-	router := h.GetHTTPHandler()
+	router := h.Init()
 
 	ts := httptest.NewServer(router)
 	defer ts.Close()
