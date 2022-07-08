@@ -17,4 +17,3 @@
 /.idea/
 *coverage.txt
 **/bin/
-.env
